@@ -15,9 +15,7 @@
       --text:#d7deea;
       --muted:#9aa8bd;
 
-      /* restrained mint indicator */
       --ind:#9fe3b6;
-
       --shadow: rgba(0,0,0,.70);
     }
     *{box-sizing:border-box}
@@ -137,7 +135,6 @@
       padding: 18px;
     }
 
-    /* full-width tactile button with faint text */
     .pressBtn{
       width:100%;
       height: 180px;
@@ -162,7 +159,6 @@
       -webkit-tap-highlight-color: transparent;
       outline: none;
     }
-
     .pressBtn::before{
       content:"";
       position:absolute;
@@ -171,17 +167,15 @@
       border:1px solid rgba(255,255,255,.06);
       pointer-events:none;
     }
-
     .pressBtn span{
       font-size: 28px;
       font-weight: 900;
       letter-spacing: 5px;
       text-transform: uppercase;
-      color: rgba(215,222,234,.44);   /* faint */
+      color: rgba(215,222,234,.44);
       user-select:none;
       -webkit-user-select:none;
     }
-
     .pressBtn:active{
       transform: translateY(2px) scale(0.997);
       border-color: rgba(159,227,182,.20);
@@ -242,7 +236,7 @@
       color: rgba(215,222,234,.92);
     }
 
-    /* slider: position only, no colored fill */
+    /* slider: position only */
     .sliderWrap{
       display:flex;
       align-items:center;
@@ -355,14 +349,13 @@
   </div>
 
 <script>
-let ctx;
-let osc;
-let gate, master;
+let ctx, osc, gate, master;
 let isHolding = false;
 let timer = null;
 let phaseOn = false;
 
 let armed = false;
+let iosUnlocked = false;
 
 const lamp = document.getElementById("lamp");
 const readout = document.getElementById("readout");
@@ -383,10 +376,8 @@ let current = MID[0];
 
 function ensureAudio(){
   if (ctx) return;
-
-  ctx = new (window.AudioContext || window.webkitAudioContext)({
-    latencyHint: "interactive"
-  });
+  // iOS互換のため、オプション無しで生成（これが一番安全）
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
 
   master = ctx.createGain();
   master.gain.value = 0.0;
@@ -405,16 +396,20 @@ function ensureAudio(){
   osc.start();
 }
 
-async function armAudio(){
-  if (armed) return true;
-  ensureAudio();
+function unlockIOSOnce(){
+  if (!ctx || iosUnlocked) return;
+  // “無音バッファを1回鳴らす” iOSアンロック定番
   try{
-    await ctx.resume();    // ★iOS対策の要
-    armed = (ctx.state === "running");
+    const buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(ctx.destination);
+    src.start(0);
+    src.stop(0.01);
+    iosUnlocked = true;
   }catch(e){
-    armed = false;
+    // 失敗しても致命傷ではない
   }
-  return armed;
 }
 
 function ramp(param, value, t=0.02){
@@ -482,14 +477,40 @@ function stopBusy(){
   if (ctx) applyCurrentFreq();
 }
 
-async function holdOn(){
-  const ok = await armAudio();   // ★ここで確実に起動
-  if (!ok) return;
-
+function actuallyStart(){
   isHolding = true;
   current = pickRandomNote();
   applyCurrentFreq();
   startBusy();
+}
+
+function holdOn(){
+  // ここは “await しない” のがiOSに効く
+  ensureAudio();
+
+  // Hz表示は即更新（イベントが来てるか確認にもなる）
+  if (!ctx){
+    readout.textContent = "—";
+    return;
+  }
+
+  // iOSアンロック + resume を同期的に発火
+  unlockIOSOnce();
+  const p = ctx.resume();
+  // resumeはPromiseだが、呼び出し自体がユーザージェスチャ内で重要
+  p.then(() => {
+    armed = (ctx.state === "running");
+    if (!armed) return;
+    actuallyStart();
+  }).catch(() => {
+    armed = false;
+    // “ここまで来る”=ブラウザ/設定に阻まれてる
+    readout.textContent = "BLOCKED";
+  });
+
+  // “即時反応”としてHzだけ先に更新（音はresume後に鳴る）
+  current = pickRandomNote();
+  if (osc) applyCurrentFreq();
 }
 
 function holdOff(){
@@ -498,9 +519,7 @@ function holdOff(){
 }
 
 /* UI updates */
-function updateLabel(){
-  msLabel.textContent = interval.value;
-}
+function updateLabel(){ msLabel.textContent = interval.value; }
 interval.addEventListener("input", updateLabel);
 updateLabel();
 
@@ -509,24 +528,28 @@ updateLabel();
     const b = band();
     const hz = current.hz * BAND_MULT[b];
     readout.textContent = `${hz.toFixed(2)} HZ`;
-    if (ctx) applyCurrentFreq();
+    if (ctx && osc) applyCurrentFreq();
   });
 });
 
-/* ---- Events: touch only (avoid double fire) ---- */
-pad.addEventListener("touchstart", (e)=>{ e.preventDefault(); holdOn(); }, {passive:false});
-pad.addEventListener("touchend", (e)=>{ e.preventDefault(); holdOff(); }, {passive:false});
-pad.addEventListener("touchcancel", (e)=>{ e.preventDefault(); holdOff(); }, {passive:false});
-
-/* Desktop mouse */
-pad.addEventListener("mousedown", (e)=>{ e.preventDefault(); holdOn(); });
-window.addEventListener("mouseup", ()=> holdOff());
+/* Events: pointer優先（iPhoneも最近はこれが一番安定） */
+if (window.PointerEvent){
+  pad.addEventListener("pointerdown", (e)=>{ e.preventDefault(); holdOn(); }, {passive:false});
+  pad.addEventListener("pointerup",   (e)=>{ e.preventDefault(); holdOff(); }, {passive:false});
+  pad.addEventListener("pointercancel",(e)=>{ e.preventDefault(); holdOff(); }, {passive:false});
+} else {
+  pad.addEventListener("touchstart", (e)=>{ e.preventDefault(); holdOn(); }, {passive:false});
+  pad.addEventListener("touchend", (e)=>{ e.preventDefault(); holdOff(); }, {passive:false});
+  pad.addEventListener("touchcancel", (e)=>{ e.preventDefault(); holdOff(); }, {passive:false});
+  pad.addEventListener("mousedown", (e)=>{ e.preventDefault(); holdOn(); });
+  window.addEventListener("mouseup", ()=> holdOff());
+}
 
 /* Safety */
 window.addEventListener("blur", ()=> holdOff());
 document.addEventListener("visibilitychange", ()=>{ if (document.hidden) holdOff(); });
 
-/* Initial readout (no audio yet) */
+/* Initial readout */
 (function init(){
   const b = band();
   const hz = current.hz * BAND_MULT[b];

@@ -6,24 +6,17 @@
   <title>Night Transmission</title>
   <style>
     :root{
-      --bg:#050607;
-      --panel:#0a0c0f;
-      --line:#2a2f3a;
-      --text:#e9edf6;
-      --muted:#a9b2c3;
-      --accent:#d7ff6b;
+      --bg:#050607; --panel:#0a0c0f; --line:#2a2f3a;
+      --text:#e9edf6; --muted:#a9b2c3; --accent:#d7ff6b;
     }
     *{box-sizing:border-box}
     body{
-      margin:0;
-      min-height:100vh;
-      display:grid;
-      place-items:center;
+      margin:0; min-height:100vh; display:grid; place-items:center;
       background:linear-gradient(180deg, #050607 0%, #070a0f 100%);
       color:var(--text);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
-    .wrap{width:min(760px, 92vw); padding:22px;}
+    .wrap{width:min(820px, 92vw); padding:22px;}
     .card{
       border:1px solid var(--line);
       background:var(--panel);
@@ -32,63 +25,25 @@
       box-shadow: 0 18px 50px rgba(0,0,0,.55);
     }
     header{
-      display:flex;
-      justify-content:space-between;
-      gap:12px;
-      align-items:flex-start;
-      padding-bottom:12px;
-      border-bottom:1px solid rgba(42,47,58,.6);
-      margin-bottom:14px;
+      display:flex; justify-content:space-between; gap:12px; align-items:flex-start;
+      padding-bottom:12px; border-bottom:1px solid rgba(42,47,58,.6); margin-bottom:14px;
     }
-    h1{
-      margin:0;
-      font-size:14px;
-      letter-spacing:1.2px;
-      text-transform:uppercase;
-      font-weight:800;
-    }
-    .jp{
-      margin-top:6px;
-      color:var(--muted);
-      font-size:12px;
-      letter-spacing:.2px;
-    }
-    .status{
-      text-align:right;
-      color:var(--muted);
-      font-size:12px;
-      line-height:1.4;
-    }
-    .led{
-      display:inline-block;
-      width:9px;height:9px;border-radius:99px;
-      background:rgba(169,178,195,.25);
-      box-shadow:none;
-      vertical-align:middle;
-      margin-right:8px;
-    }
-    .led.on{
-      background:var(--accent);
-      box-shadow:0 0 18px rgba(215,255,107,.45);
-    }
+    h1{margin:0; font-size:14px; letter-spacing:1.2px; text-transform:uppercase; font-weight:800;}
+    .jp{margin-top:6px; color:var(--muted); font-size:12px;}
+    .status{ text-align:right; color:var(--muted); font-size:12px; line-height:1.4; }
+    .led{ display:inline-block; width:9px;height:9px;border-radius:99px;
+      background:rgba(169,178,195,.25); vertical-align:middle; margin-right:8px; }
+    .led.on{background:var(--accent); box-shadow:0 0 18px rgba(215,255,107,.45);}
 
-    /* single button */
     #pad{
-      width:100%;
-      height:260px;
+      width:100%; height:260px;
       border:1px solid rgba(233,237,246,.18);
       border-radius:12px;
       background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
       color:var(--text);
-      font-size:22px;
-      font-weight:900;
-      letter-spacing:1.4px;
-      text-transform:uppercase;
-      user-select:none;
-      -webkit-user-select:none;
-      touch-action:none;
-      display:grid;
-      place-items:center;
+      font-size:22px; font-weight:900; letter-spacing:1.4px; text-transform:uppercase;
+      user-select:none; -webkit-user-select:none; touch-action:none;
+      display:grid; place-items:center;
     }
     #pad:active{
       border-color: rgba(215,255,107,.5);
@@ -96,29 +51,33 @@
     }
 
     .controls{
-      margin-top:14px;
-      padding-top:14px;
+      margin-top:14px; padding-top:14px;
       border-top:1px solid rgba(42,47,58,.6);
-      display:grid;
-      gap:10px;
+      display:grid; gap:12px;
     }
     .row{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
+      display:flex; justify-content:space-between; align-items:center; gap:12px;
+      color:var(--muted); font-size:12px;
+    }
+    .seg{display:flex; gap:8px; flex-wrap:wrap;}
+    .seg input{display:none;}
+    .seg label{
+      padding:10px 12px;
+      border:1px solid rgba(169,178,195,.25);
+      border-radius:10px;
+      cursor:pointer;
       color:var(--muted);
       font-size:12px;
+      letter-spacing:.6px;
+      user-select:none;
     }
-    input[type="range"]{
-      width:100%;
-      accent-color: var(--accent);
+    .seg input:checked + label{
+      border-color: rgba(215,255,107,.55);
+      color:var(--text);
+      box-shadow: 0 0 0 2px rgba(215,255,107,.12) inset;
     }
-    .hint{
-      color:rgba(169,178,195,.85);
-      font-size:12px;
-      line-height:1.7;
-    }
+
+    .hint{color:rgba(169,178,195,.85); font-size:12px; line-height:1.7;}
     .mono{font-variant-numeric: tabular-nums;}
   </style>
 </head>
@@ -133,7 +92,7 @@
         </div>
         <div class="status">
           <div><span class="led" id="led"></span><span id="state">IDLE</span></div>
-          <div class="mono" id="readout">Fmaj7(9) → (F A C E G)</div>
+          <div class="mono" id="readout">F • MID • 349.23 Hz</div>
         </div>
       </header>
 
@@ -141,12 +100,43 @@
 
       <div class="controls">
         <div class="row">
-          <div>BUSY INTERVAL</div>
-          <div class="mono"><span id="msLabel">420</span> ms</div>
+          <div>BAND</div>
+          <div class="mono">LOW / MID / HIGH</div>
         </div>
-        <input id="interval" type="range" min="160" max="900" value="420" step="10" />
+        <div class="seg" role="radiogroup" aria-label="band">
+          <input id="bandLow"  name="band" type="radio" checked>
+          <label for="bandLow">LOW</label>
+
+          <input id="bandMid"  name="band" type="radio">
+          <label for="bandMid">MID</label>
+
+          <input id="bandHigh" name="band" type="radio">
+          <label for="bandHigh">HIGH</label>
+        </div>
+
+        <div class="row">
+          <div>NOTE (Fmaj7(9))</div>
+          <div class="mono">F A C E G</div>
+        </div>
+        <div class="seg" role="radiogroup" aria-label="note">
+          <input id="nF" name="note" type="radio" checked>
+          <label for="nF">F</label>
+
+          <input id="nA" name="note" type="radio">
+          <label for="nA">A</label>
+
+          <input id="nC" name="note" type="radio">
+          <label for="nC">C</label>
+
+          <input id="nE" name="note" type="radio">
+          <label for="nE">E</label>
+
+          <input id="nG" name="note" type="radio">
+          <label for="nG">G</label>
+        </div>
+
         <div class="hint">
-          押してる間だけ鳴る。押すたびに Fmaj7(9)（F A C E G）からランダムに2音選択。<br>
+          サイン波・1音のみ。押している間だけ鳴る。<br>
           音が出ない時：音量/マナーモード/BT出力/タブミュート/サイトのサウンド許可。
         </div>
       </div>
@@ -155,61 +145,42 @@
 
 <script>
 let ctx;
-let o1, o2;
-let gate, master, bp;
+let osc;
+let master;
 let isHolding = false;
-let timer = null;
-let phaseOn = false;
 
 const led = document.getElementById("led");
 const stateEl = document.getElementById("state");
 const readout = document.getElementById("readout");
 const pad = document.getElementById("pad");
-const interval = document.getElementById("interval");
-const msLabel = document.getElementById("msLabel");
 
-// Fmaj7(9) chord tones: F A C E G
-// (電話っぽくするため、あえて中高域寄りのオクターブ)
-const chord = [
-  { name: "F", hz: 349.228 }, // F4
-  { name: "A", hz: 440.000 }, // A4
-  { name: "C", hz: 523.251 }, // C5
-  { name: "E", hz: 659.255 }, // E5
-  { name: "G", hz: 783.991 }, // G5
-];
+// MID register base frequencies for Fmaj7(9) chord tones
+const MID = {
+  F: 349.228, // F4
+  A: 440.000, // A4
+  C: 523.251, // C5
+  E: 659.255, // E5
+  G: 783.991, // G5
+};
+
+// LOW/MID/HIGH multipliers (octaves)
+const BAND_MULT = { LOW: 0.5, MID: 1.0, HIGH: 2.0 };
 
 function ensureAudio(){
   if (ctx) return;
-
   ctx = new (window.AudioContext || window.webkitAudioContext)();
 
   master = ctx.createGain();
   master.gain.value = 0.0;
 
-  gate = ctx.createGain();
-  gate.gain.value = 0.0;
+  osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.value = MID.F;
 
-  // telephone-ish bandpass (無骨な回線感)
-  bp = ctx.createBiquadFilter();
-  bp.type = "bandpass";
-  bp.frequency.value = 1400;
-  bp.Q.value = 0.9;
-
-  o1 = ctx.createOscillator();
-  o2 = ctx.createOscillator();
-
-  // 無骨さ：square（刺さるなら "sine" に変えてOK）
-  o1.type = "square";
-  o2.type = "square";
-
-  o1.connect(gate);
-  o2.connect(gate);
-  gate.connect(bp);
-  bp.connect(master);
+  osc.connect(master);
   master.connect(ctx.destination);
 
-  o1.start();
-  o2.start();
+  osc.start();
 }
 
 function ramp(param, value, t=0.02){
@@ -219,96 +190,61 @@ function ramp(param, value, t=0.02){
   param.linearRampToValueAtTime(value, now + t);
 }
 
+function getBand(){
+  if (document.getElementById("bandHigh").checked) return "HIGH";
+  if (document.getElementById("bandMid").checked) return "MID";
+  return "LOW";
+}
+function getNote(){
+  if (document.getElementById("nA").checked) return "A";
+  if (document.getElementById("nC").checked) return "C";
+  if (document.getElementById("nE").checked) return "E";
+  if (document.getElementById("nG").checked) return "G";
+  return "F";
+}
+
 function setUI(active, text){
   led.classList.toggle("on", !!active);
   stateEl.textContent = active ? "TX" : "IDLE";
   if (text) readout.textContent = text;
 }
 
-function pickTwoDistinct(){
-  const a = (Math.random() * chord.length) | 0;
-  let b = (Math.random() * chord.length) | 0;
-  while (b === a) b = (Math.random() * chord.length) | 0;
-  return [chord[a], chord[b]];
-}
-
-function setRandomChordTones(){
-  const [n1, n2] = pickTwoDistinct();
-
-  // ほんの微デチューンで「回線の揺れ」
-  const det1 = 1 + (Math.random()*0.006 - 0.003);
-  const det2 = 1 + (Math.random()*0.006 - 0.003);
-
-  o1.frequency.value = n1.hz * det1;
-  o2.frequency.value = n2.hz * det2;
-
-  // bandpassも少しだけ揺らして電話感
-  bp.frequency.value = 1100 + Math.random()*1100;
-  bp.Q.value = 0.7 + Math.random()*0.8;
-
-  setUI(isHolding, `${n1.name} + ${n2.name}  |  Fmaj7(9)`);
-}
-
-// Busy cadence loop: interval ms ON / interval ms OFF
-function startCadence(){
-  if (timer) return;
-  phaseOn = false;
-
-  const step = () => {
-    if (!isHolding) return;
-
-    const ms = Number(interval.value);
-    phaseOn = !phaseOn;
-
-    if (phaseOn){
-      // ON
-      ramp(gate.gain, 1.0, 0.01);
-      ramp(master.gain, 0.14, 0.015);
-      setUI(true);
-      timer = setTimeout(step, ms);
-    } else {
-      // OFF
-      ramp(gate.gain, 0.0, 0.03);
-      ramp(master.gain, 0.0, 0.05);
-      setUI(false);
-      timer = setTimeout(step, ms);
-    }
-  };
-
-  step();
-}
-
-function stopCadence(){
-  if (timer){
-    clearTimeout(timer);
-    timer = null;
-  }
-  if (ctx){
-    ramp(gate.gain, 0.0, 0.04);
-    ramp(master.gain, 0.0, 0.06);
-  }
-  setUI(false, "Fmaj7(9) → (F A C E G)");
+function applyFrequency(){
+  const band = getBand();
+  const note = getNote();
+  const hz = MID[note] * BAND_MULT[band];
+  osc.frequency.value = hz;
+  setUI(isHolding, `${note} • ${band} • ${hz.toFixed(2)} Hz`);
 }
 
 function holdOn(){
   ensureAudio();
   ctx.resume();
   isHolding = true;
-
-  // Each press: new random chord tones
-  setRandomChordTones();
-  startCadence();
+  applyFrequency();
+  ramp(master.gain, 0.16, 0.015); // volume
+  setUI(true);
 }
 
 function holdOff(){
   isHolding = false;
-  stopCadence();
+  if (ctx) ramp(master.gain, 0.0, 0.05);
+  const band = getBand();
+  const note = getNote();
+  const hz = MID[note] * BAND_MULT[band];
+  setUI(false, `${note} • ${band} • ${hz.toFixed(2)} Hz`);
 }
 
-// slider label
-function updateLabel(){ msLabel.textContent = interval.value; }
-interval.addEventListener("input", updateLabel);
-updateLabel();
+// update readout when changing selection
+["bandLow","bandMid","bandHigh","nF","nA","nC","nE","nG"].forEach(id=>{
+  document.getElementById(id).addEventListener("change", ()=>{
+    const band = getBand();
+    const note = getNote();
+    const hz = MID[note] * BAND_MULT[band];
+    readout.textContent = `${note} • ${band} • ${hz.toFixed(2)} Hz`;
+    if (ctx && isHolding) applyFrequency();
+  });
+});
 
 // Events (mouse + touch)
 pad.addEventListener("mousedown", (e)=>{ e.preventDefault(); holdOn(); });
@@ -320,6 +256,14 @@ pad.addEventListener("touchcancel", (e)=>{ e.preventDefault(); holdOff(); }, {pa
 
 window.addEventListener("blur", ()=> holdOff());
 document.addEventListener("visibilitychange", ()=>{ if (document.hidden) holdOff(); });
+
+// Initial readout
+(function init(){
+  const band = getBand();
+  const note = getNote();
+  const hz = MID[note] * BAND_MULT[band];
+  readout.textContent = `${note} • ${band} • ${hz.toFixed(2)} Hz`;
+})();
 </script>
 </body>
 </html>

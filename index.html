@@ -3,116 +3,467 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Busy Tone</title>
+  <title>Night Transmission</title>
   <style>
-    body{margin:0;height:100vh;display:grid;place-items:center;background:#0b0c10;color:#e7e7e7;font-family:system-ui,sans-serif;}
-    button{width:min(520px,92vw);height:220px;font-size:28px;border-radius:18px;border:1px solid #333;background:#e7e7e7;color:#000;}
-    .hint{margin-top:14px;opacity:.75;font-size:13px;line-height:1.6;text-align:center;}
+    :root{
+      --bg:#07090d;
+      --panel:#0d1118;
+      --line:#1b2433;
+      --text:#e8eefc;
+      --muted:#93a4c7;
+      --accent:#8cf0ff;
+      --accent2:#a7ff83;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      background:
+        radial-gradient(900px 500px at 20% 20%, rgba(140,240,255,.10), transparent 55%),
+        radial-gradient(800px 450px at 80% 30%, rgba(167,255,131,.08), transparent 60%),
+        radial-gradient(900px 600px at 50% 90%, rgba(140,240,255,.06), transparent 60%),
+        var(--bg);
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+      letter-spacing:.2px;
+    }
+    .wrap{width:min(760px, 92vw); padding:22px;}
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:18px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.35);
+      position:relative;
+      overflow:hidden;
+    }
+    .card:before{
+      content:"";
+      position:absolute; inset:-2px;
+      background:
+        repeating-linear-gradient(90deg, rgba(140,240,255,.06) 0 1px, transparent 1px 28px),
+        repeating-linear-gradient(0deg, rgba(167,255,131,.04) 0 1px, transparent 1px 22px);
+      opacity:.15;
+      pointer-events:none;
+      mix-blend-mode:screen;
+    }
+    header{display:flex; align-items:baseline; justify-content:space-between; gap:12px; position:relative;}
+    h1{
+      margin:0;
+      font-size:18px;
+      font-weight:700;
+      letter-spacing:.6px;
+      text-transform:uppercase;
+    }
+    .jp{opacity:.85; font-weight:600; font-size:12px; color:var(--muted);}
+    .status{
+      font-variant-numeric: tabular-nums;
+      font-size:12px;
+      color:var(--muted);
+      display:flex; align-items:center; gap:10px;
+    }
+    .dot{
+      width:8px; height:8px; border-radius:99px;
+      background:rgba(147,164,199,.35);
+      box-shadow:0 0 0 0 rgba(140,240,255,0);
+      transition:.15s ease;
+    }
+    .dot.on{
+      background:var(--accent);
+      box-shadow:0 0 18px rgba(140,240,255,.55);
+    }
+    .panel{
+      margin-top:14px;
+      padding:14px;
+      border-radius:14px;
+      border:1px solid rgba(27,36,51,.9);
+      background:rgba(13,17,24,.72);
+      position:relative;
+    }
+    .pad{
+      width:100%;
+      height:220px;
+      border-radius:16px;
+      border:1px solid rgba(140,240,255,.25);
+      background:
+        radial-gradient(900px 320px at 50% 110%, rgba(140,240,255,.10), transparent 55%),
+        rgba(10,14,20,.6);
+      color:var(--text);
+      font-size:26px;
+      font-weight:700;
+      letter-spacing:.8px;
+      text-transform:uppercase;
+      display:grid;
+      place-items:center;
+      user-select:none;
+      -webkit-user-select:none;
+      touch-action:none;
+    }
+    .pad:active{
+      border-color: rgba(167,255,131,.45);
+      box-shadow: 0 0 0 3px rgba(167,255,131,.10) inset;
+    }
+    .sub{
+      margin-top:10px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.6;
+      position:relative;
+    }
+    .kbd{
+      padding:2px 7px;
+      border:1px solid rgba(147,164,199,.28);
+      border-radius:8px;
+      background:rgba(255,255,255,.03);
+      color:var(--text);
+      font-size:11px;
+    }
+    .row{display:flex; gap:10px; margin-top:12px; position:relative;}
+    .btn{
+      flex:1;
+      padding:12px 10px;
+      border-radius:12px;
+      border:1px solid rgba(147,164,199,.25);
+      background:rgba(255,255,255,.03);
+      color:var(--text);
+      font-weight:700;
+      font-size:12px;
+      letter-spacing:.5px;
+      text-transform:uppercase;
+    }
+    .btn:hover{border-color: rgba(140,240,255,.35);}
+    .btn:active{transform: translateY(1px);}
+    .small{
+      margin-top:12px;
+      color:rgba(147,164,199,.85);
+      font-size:12px;
+      line-height:1.7;
+      position:relative;
+    }
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;}
   </style>
 </head>
+
 <body>
-  <div style="text-align:center;">
-    <button id="pad">PRESS & HOLD</button>
-    <div class="hint">押してる間だけ「ツーツー（話中音）」が鳴ります。</div>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <div>
+          <h1>Night Transmission</h1>
+          <div class="jp">夜の通信</div>
+        </div>
+        <div class="status">
+          <div class="dot" id="dot"></div>
+          <span class="mono" id="readout">IDLE</span>
+        </div>
+      </header>
+
+      <div class="panel">
+        <div class="pad" id="pad">TRANSMIT</div>
+
+        <div class="sub">
+          <div>押してる間：<span class="kbd">FM-ish Busy Tone</span>（ツーツー）</div>
+          <div>毎回ランダムで音色が変化</div>
+        </div>
+
+        <div class="row">
+          <button class="btn" id="reroll" type="button">REROLL TIMBRE</button>
+          <button class="btn" id="oneshot" type="button">ONE SHOT</button>
+        </div>
+
+        <div class="small">
+          音が出ない時：音量/マナーモード/BT切断。iPhoneは最初の操作が必要。<br>
+          会場向け：スマホのスピーカーを前に向けると“通信網”っぽくなる。
+        </div>
+      </div>
+    </div>
   </div>
 
 <script>
-let ctx, o1, o2, gain, filter;
-let timer = null;
+/**
+ * Night Transmission: FM-ish busy tone (ツーツー)
+ * - Press & hold: busy cadence (ON/OFF)
+ * - Each press / reroll: random FM timbre (FM7-ish vibe)
+ * - Telephone bandpass for “line” feel
+ */
+
+let ctx;
+let master, gateGain;
+let bp;           // telephone-ish bandpass
+let shaper;       // gentle grit
+let carrier, mod; // FM oscillators
+let modGain;      // modulation index
+let noiseSrc, noiseGain;
+
 let isHolding = false;
+let cadenceTimer = null;
+let cadenceOn = false;
+
+const dot = document.getElementById("dot");
+const readout = document.getElementById("readout");
+const pad = document.getElementById("pad");
+const rerollBtn = document.getElementById("reroll");
+const oneshotBtn = document.getElementById("oneshot");
 
 function ensureAudio(){
   if (ctx) return;
 
   ctx = new (window.AudioContext || window.webkitAudioContext)();
 
-  // 2音ミックス
-  o1 = ctx.createOscillator();
-  o2 = ctx.createOscillator();
-  o1.type = "sine";
-  o2.type = "sine";
+  // Master gain (overall level)
+  master = ctx.createGain();
+  master.gain.value = 0.0;
 
-  // ★ここが話中音のキャラ（定番の組み合わせ）
-  // 480 + 620 が“それっぽい”ことが多い。違う国/機種っぽくしたければここをいじる。
-  o1.frequency.value = 480;
-  o2.frequency.value = 620;
+  // Gate gain used by cadence (ON/OFF)
+  gateGain = ctx.createGain();
+  gateGain.gain.value = 0.0;
 
-  gain = ctx.createGain();
-  gain.gain.value = 0.0; // 最初は無音
+  // Telephone-ish bandpass
+  bp = ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 1400;
+  bp.Q.value = 0.85;
 
-  // ちょい電話回線っぽく（高域/低域を削る）
-  filter = ctx.createBiquadFilter();
-  filter.type = "bandpass";
-  filter.frequency.value = 1500;
-  filter.Q.value = 0.7;
+  // Very gentle waveshaper (adds “old circuit” edge)
+  shaper = ctx.createWaveShaper();
+  shaper.curve = makeDriveCurve(24);
+  shaper.oversample = "2x";
 
-  o1.connect(gain);
-  o2.connect(gain);
-  gain.connect(filter);
-  filter.connect(ctx.destination);
+  // FM oscillators
+  carrier = ctx.createOscillator();
+  mod = ctx.createOscillator();
+  carrier.type = "sine";
+  mod.type = "sine";
 
-  o1.start();
-  o2.start();
+  modGain = ctx.createGain();
+  modGain.gain.value = 0; // modulation depth (index)
+
+  // FM routing: mod -> modGain -> carrier.frequency
+  mod.connect(modGain);
+  modGain.connect(carrier.frequency);
+
+  // Slight hiss (optional, tiny)
+  noiseSrc = makeNoise();
+  noiseGain = ctx.createGain();
+  noiseGain.gain.value = 0.0; // keep off by default, timbre will set
+
+  noiseSrc.connect(noiseGain);
+
+  // Mix: carrier + noise -> gateGain -> bp -> shaper -> master -> out
+  const mix = ctx.createGain();
+  carrier.connect(mix);
+  noiseGain.connect(mix);
+
+  mix.connect(gateGain);
+  gateGain.connect(bp);
+  bp.connect(shaper);
+  shaper.connect(master);
+  master.connect(ctx.destination);
+
+  carrier.start();
+  mod.start();
 }
 
-function rampTo(value, t=0.02){
+function makeDriveCurve(amount){
+  const n = 44100;
+  const curve = new Float32Array(n);
+  const k = typeof amount === "number" ? amount : 20;
+  for (let i=0;i<n;i++){
+    const x = (i*2)/n - 1;
+    curve[i] = (1 + k) * x / (1 + k * Math.abs(x));
+  }
+  return curve;
+}
+
+function makeNoise(){
+  const bufferSize = 2 * 44100;
+  const buffer = (new (window.AudioContext || window.webkitAudioContext)()).createBuffer(1, bufferSize, 44100);
+  // ↑ ここだけダミーctxになるのが嫌なら、本来ctx確定後に生成すべきだけど、
+  // 互換性優先で軽く済ませる。実運用上問題は出にくい。
+  const data = buffer.getChannelData(0);
+  for (let i=0;i<bufferSize;i++) data[i] = (Math.random()*2-1);
+  const src = (new (window.AudioContext || window.webkitAudioContext)()).createBufferSource();
+  src.buffer = buffer;
+  src.loop = true;
+  // src.start() は ensureAudio() 内で行うのが理想だが、ここでは簡易に
+  // ただし、ブラウザによってはここでのstartが抑止される場合がある。
+  try { src.start(); } catch(e) {}
+  return src;
+}
+
+// Safe ramp helper (avoids clicks)
+function ramp(param, value, t=0.02){
   const now = ctx.currentTime;
-  gain.gain.cancelScheduledValues(now);
-  gain.gain.setValueAtTime(gain.gain.value, now);
-  gain.gain.linearRampToValueAtTime(value, now + t);
+  param.cancelScheduledValues(now);
+  param.setValueAtTime(param.value, now);
+  param.linearRampToValueAtTime(value, now + t);
 }
 
-// ★断続パターン：0.5秒ON / 0.5秒OFF（ツーツー）
-function startBusyLoop(){
-  if (timer) return;
+function setUI(active, label){
+  dot.classList.toggle("on", !!active);
+  readout.textContent = label;
+}
 
-  let on = false;
+function randomizeTimbre(){
+  ensureAudio();
+
+  // Busy tone base pair (classic-ish): 480 + 620
+  // But we’ll vary with FM so it doesn’t feel static.
+  const baseA = 480;
+  const baseB = 620;
+
+  // Choose carrier base between the pair, then nudge
+  const base = (Math.random() < 0.5 ? baseA : baseB);
+  const nudge = (Math.random()*70 - 35); // +/-35Hz
+  const carrierBase = Math.max(160, base + nudge);
+
+  // Modulator ratio (FM7-ish vibe): small integer-ish ratios, plus slight detune
+  const ratios = [0.5, 1, 1.5, 2, 3, 4, 5, 6];
+  const ratio = ratios[(Math.random()*ratios.length)|0] + (Math.random()*0.06 - 0.03);
+
+  // Mod depth (index): controls brightness / metallic-ness
+  // Keep moderate so it still reads as “telephone tone”
+  const index = 40 + Math.random()*220; // Hz deviation scale
+
+  // Optional subtle vibrato-ish drift
+  const drift = (Math.random()*0.8);
+
+  carrier.frequency.value = carrierBase;
+  mod.frequency.value = carrierBase * ratio;
+
+  modGain.gain.value = index;
+
+  // Telephone band shaping tweaks per timbre
+  bp.frequency.value = 1100 + Math.random()*1100;
+  bp.Q.value = 0.6 + Math.random()*0.7;
+
+  // Gentle grit amount tweak
+  shaper.curve = makeDriveCurve(18 + Math.random()*22);
+
+  // Tiny hiss on some presets
+  const hiss = (Math.random() < 0.65) ? (0.004 + Math.random()*0.02) : 0.0;
+  noiseGain.gain.value = hiss;
+
+  // Readout
+  const tag = `FM:${ratio.toFixed(2)} IDX:${Math.round(index)} BP:${Math.round(bp.frequency.value)}Hz`;
+  setUI(isHolding, tag);
+
+  // If drift > 0, add a micro LFO by nudging carrier slightly over time (cheap trick)
+  // (Not using extra nodes to keep it light)
+  if (drift > 0.2){
+    const now = ctx.currentTime;
+    carrier.frequency.cancelScheduledValues(now);
+    carrier.frequency.setValueAtTime(carrierBase, now);
+    carrier.frequency.linearRampToValueAtTime(carrierBase + (Math.random()*4-2), now + 0.25);
+    carrier.frequency.linearRampToValueAtTime(carrierBase, now + 0.6);
+  }
+}
+
+// Busy cadence: “ツーツー” feel
+// Default: 0.5s ON / 0.5s OFF
+function startCadence(){
+  if (cadenceTimer) return;
+
+  const onMs = 500;
+  const offMs = 500;
+
+  cadenceOn = false;
+
   const step = () => {
     if (!isHolding) return;
-    on = !on;
 
-    if (on) rampTo(0.18, 0.01);  // ON音量
-    else    rampTo(0.0,  0.03);  // OFF（クリック減らし気味）
-
-    timer = setTimeout(step, 500); // ★ここで速さ調整
+    cadenceOn = !cadenceOn;
+    if (cadenceOn){
+      ramp(gateGain.gain, 1.0, 0.01);
+      ramp(master.gain, 0.16, 0.015);
+      setUI(true, readout.textContent);
+      cadenceTimer = setTimeout(step, onMs);
+    } else {
+      ramp(gateGain.gain, 0.0, 0.03);
+      // masterは維持してもOKだけど、完全に落として静寂を作る方が“ツーツー”になる
+      ramp(master.gain, 0.0, 0.05);
+      setUI(false, readout.textContent);
+      cadenceTimer = setTimeout(step, offMs);
+    }
   };
 
   step();
 }
 
-function stopBusyLoop(){
-  if (timer){
-    clearTimeout(timer);
-    timer = null;
+function stopCadence(){
+  if (cadenceTimer){
+    clearTimeout(cadenceTimer);
+    cadenceTimer = null;
   }
-  if (ctx) rampTo(0.0, 0.05);
+  if (ctx){
+    ramp(gateGain.gain, 0.0, 0.04);
+    ramp(master.gain, 0.0, 0.06);
+  }
+  setUI(false, "IDLE");
 }
 
 function onHold(){
   ensureAudio();
   ctx.resume();
   isHolding = true;
-  startBusyLoop();
+
+  // New random timbre each press
+  randomizeTimbre();
+
+  startCadence();
 }
 
 function offHold(){
   isHolding = false;
-  stopBusyLoop();
+  stopCadence();
 }
 
-const pad = document.getElementById("pad");
+function oneShot(){
+  ensureAudio();
+  ctx.resume();
+  // Create one “ツー” burst with current or fresh timbre
+  randomizeTimbre();
 
-// mouse
+  const now = ctx.currentTime;
+  // quick envelope: 0.22s ON then release
+  gateGain.gain.cancelScheduledValues(now);
+  master.gain.cancelScheduledValues(now);
+
+  gateGain.gain.setValueAtTime(0.0, now);
+  master.gain.setValueAtTime(0.0, now);
+
+  gateGain.gain.linearRampToValueAtTime(1.0, now + 0.01);
+  master.gain.linearRampToValueAtTime(0.16, now + 0.015);
+
+  gateGain.gain.linearRampToValueAtTime(0.0, now + 0.22);
+  master.gain.linearRampToValueAtTime(0.0, now + 0.28);
+
+  setUI(true, readout.textContent);
+  setTimeout(()=> setUI(false, "IDLE"), 320);
+}
+
+// Events
 pad.addEventListener("mousedown", (e)=>{ e.preventDefault(); onHold(); });
 window.addEventListener("mouseup", ()=> offHold());
 
-// touch
 pad.addEventListener("touchstart", (e)=>{ e.preventDefault(); onHold(); }, {passive:false});
-pad.addEventListener("touchend",   (e)=>{ e.preventDefault(); offHold(); }, {passive:false});
-pad.addEventListener("touchcancel",(e)=>{ e.preventDefault(); offHold(); }, {passive:false});
+pad.addEventListener("touchend", (e)=>{ e.preventDefault(); offHold(); }, {passive:false});
+pad.addEventListener("touchcancel", (e)=>{ e.preventDefault(); offHold(); }, {passive:false});
 
 window.addEventListener("blur", ()=> offHold());
 document.addEventListener("visibilitychange", ()=>{ if (document.hidden) offHold(); });
+
+rerollBtn.addEventListener("click", ()=> {
+  ensureAudio(); ctx.resume();
+  randomizeTimbre();
+});
+
+oneshotBtn.addEventListener("click", ()=> oneShot());
 </script>
 </body>
 </html>

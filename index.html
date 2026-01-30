@@ -18,6 +18,7 @@
       --shadow: rgba(0,0,0,.70);
     }
     *{box-sizing:border-box}
+    html, body { height:100%; }
     body{
       margin:0;
       min-height:100vh;
@@ -30,6 +31,7 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
       letter-spacing:.45px;
       color: var(--text);
+      overscroll-behavior: none; /* iOSのスクロール暴発対策 */
     }
 
     .wrap{width:min(860px, 94vw); padding:22px;}
@@ -76,9 +78,12 @@
       box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
       position:relative;
       overflow:hidden;
+
+      touch-action:none;
+      -webkit-tap-highlight-color: transparent;
     }
 
-    /* Subtle grid — no text */
+    /* Subtle grid */
     .padPlate::before{
       content:"";
       position:absolute;
@@ -91,18 +96,16 @@
       pointer-events:none;
     }
 
-    /* center cross hair */
-    .padPlate::after{
-      content:"";
+    /* crosshair */
+    .vline{
       position:absolute;
-      left:50%; top:50%;
+      left:50%; top:0;
       width:1px; height:100%;
       background: rgba(255,255,255,.08);
-      transform:translate(-50%,-50%);
-      box-shadow: 0 0 0 9999px rgba(0,0,0,0);
+      transform:translateX(-50%);
       pointer-events:none;
     }
-    .crossH{
+    .hline{
       position:absolute;
       left:0; top:50%;
       width:100%; height:1px;
@@ -125,16 +128,18 @@
     }
     .dot.off{
       opacity:.25;
-      background: rgba(159,227,182,.20);
+      background: rgba(159,227,182,.18);
       box-shadow:none;
     }
 
-    /* Make sure iOS doesn't scroll */
+    /* hit layer */
     .padHit{
       position:absolute;
       inset:0;
+      display:block;
       touch-action:none;
       -webkit-tap-highlight-color: transparent;
+      background: transparent;
     }
   </style>
 </head>
@@ -148,7 +153,8 @@
 
       <div class="mid">
         <div class="padPlate" id="pad">
-          <div class="crossH"></div>
+          <div class="vline"></div>
+          <div class="hline"></div>
           <div class="dot off" id="dot"></div>
           <div class="padHit" id="hit" aria-label="XY pad"></div>
         </div>
@@ -157,29 +163,22 @@
   </div>
 
 <script>
-/**
- * XY PAD mapping:
- *  y: top = slow (interval long), bottom = fast (interval short)
- *  x: left = LOW, right = HIGH (continuous)
- *
- * Notes: random pick from Fmaj7(9): F A C E G
- * Tone: sine + "busy tone" gating (square LFO -> waveshaper -> gain)
- */
+/* XY mapping
+   y: top slow (interval long), bottom fast (interval short)
+   x: left low, right high (continuous mult)
+*/
 
 let ctx, osc, gate, master;
 let lfo, shaper, lfoDepth;
-let armed = false;
 let iosUnlocked = false;
 
 const pad = document.getElementById("pad");
 const hit = document.getElementById("hit");
 const dot = document.getElementById("dot");
 
-// interval range (ms)
-const MIN_MS = 160; // fastest
-const MAX_MS = 900; // slowest
+const MIN_MS = 160;
+const MAX_MS = 900;
 
-// base chord tones (MID set)
 const MID = [
   { name: "F", hz: 349.228 },
   { name: "A", hz: 440.000 },
@@ -189,45 +188,33 @@ const MID = [
 ];
 
 let current = MID[0];
-
-// current XY state
-let x01 = 0.5; // 0..1
-let y01 = 0.5; // 0..1
+let x01 = 0.5;
+let y01 = 0.5;
 let holding = false;
 
 function clamp01(v){ return Math.max(0, Math.min(1, v)); }
-function pickRandomNote(){
-  return MID[(Math.random() * MID.length) | 0];
-}
+function pickRandomNote(){ return MID[(Math.random() * MID.length) | 0]; }
 
-// x mapping: piecewise so center ~= 1.0, left min 0.5, right max 2.0
 function xToMult(x){
-  if (x < 0.5) return 0.5 + x * 1.0;        // 0.5..1.0
-  return 1.0 + (x - 0.5) * 2.0;             // 1.0..2.0
+  if (x < 0.5) return 0.5 + x * 1.0;   // 0.5..1.0
+  return 1.0 + (x - 0.5) * 2.0;        // 1.0..2.0
 }
-
-// y mapping: top slow (MAX), bottom fast (MIN)
 function yToMs(y){
-  return MAX_MS - (MAX_MS - MIN_MS) * y;    // linear
+  return MAX_MS - (MAX_MS - MIN_MS) * y;
 }
-
-// LFO frequency: square wave toggles each half-cycle
-// ON = interval, OFF = interval => full period = 2*ms => freq = 1/(2*sec) = 500/ms
 function msToLfoHz(ms){
-  return 500 / ms;
+  return 500 / ms; // square LFO full-cycle = 2*ms
 }
 
 function ensureAudio(){
   if (ctx) return;
-
   ctx = new (window.AudioContext || window.webkitAudioContext)();
 
-  // Main audio path
   master = ctx.createGain();
   master.gain.value = 0.0;
 
   gate = ctx.createGain();
-  gate.gain.value = 0.0; // will be driven by LFO
+  gate.gain.value = 0.0;
 
   osc = ctx.createOscillator();
   osc.type = "sine";
@@ -236,33 +223,29 @@ function ensureAudio(){
   osc.connect(gate);
   gate.connect(master);
   master.connect(ctx.destination);
-
   osc.start();
 
-  // Busy gate generator
+  // LFO gate
   lfo = ctx.createOscillator();
   lfo.type = "square";
   lfo.frequency.value = msToLfoHz(yToMs(y01));
 
-  // square (-1..1) -> (0..1)
   shaper = ctx.createWaveShaper();
   const N = 1024;
   const curve = new Float32Array(N);
-  for (let i = 0; i < N; i++){
-    const x = (i / (N - 1)) * 2 - 1;
-    curve[i] = x >= 0 ? 1 : 0;
+  for (let i=0;i<N;i++){
+    const x = (i/(N-1))*2-1;
+    curve[i] = x >= 0 ? 1 : 0; // 0/1 gate
   }
   shaper.curve = curve;
   shaper.oversample = "4x";
 
-  // depth: 0 (off) or 1 (on)
   lfoDepth = ctx.createGain();
   lfoDepth.gain.value = 0.0;
 
   lfo.connect(shaper);
   shaper.connect(lfoDepth);
   lfoDepth.connect(gate.gain);
-
   lfo.start();
 }
 
@@ -287,7 +270,6 @@ function ramp(param, value, t=0.02){
 }
 
 function applyXY(){
-  // update dot position
   const r = pad.getBoundingClientRect();
   dot.style.left = (x01 * r.width) + "px";
   dot.style.top  = (y01 * r.height) + "px";
@@ -297,71 +279,63 @@ function applyXY(){
   const mult = xToMult(x01);
   const ms = yToMs(y01);
 
-  // random tiny detune so it feels “alive”
   const det = 1 + (Math.random()*0.002 - 0.001);
   osc.frequency.value = (current.hz * mult) * det;
 
   lfo.frequency.value = msToLfoHz(ms);
 }
 
-function armAndStart(){
+function startAudioGesture(){
   ensureAudio();
   unlockIOSOnce();
 
-  // Important: call resume inside user gesture
+  // 重要：resumeを“ユーザー操作の中”で呼ぶ
   ctx.resume().then(() => {
-    armed = (ctx.state === "running");
-    if (!armed) return;
+    if (ctx.state !== "running") return;
 
     holding = true;
     dot.classList.remove("off");
 
-    // choose note on press
     current = pickRandomNote();
     applyXY();
 
-    // turn on gating + volume
     ramp(lfoDepth.gain, 1.0, 0.02);
     ramp(master.gain, 0.16, 0.02);
-  }).catch(() => {
-    armed = false;
-  });
+  }).catch(()=>{});
 }
 
 function stop(){
   holding = false;
   dot.classList.add("off");
   if (!ctx) return;
-  // fade out
   ramp(lfoDepth.gain, 0.0, 0.03);
   ramp(master.gain, 0.0, 0.05);
 }
 
-function updateFromEvent(e){
+function updateFromClientXY(clientX, clientY){
   const r = pad.getBoundingClientRect();
-  const cx = (e.clientX - r.left) / r.width;
-  const cy = (e.clientY - r.top) / r.height;
-  x01 = clamp01(cx);
-  y01 = clamp01(cy);
+  x01 = clamp01((clientX - r.left) / r.width);
+  y01 = clamp01((clientY - r.top) / r.height);
   applyXY();
 }
 
-// Pointer Events (best cross-platform)
-let pid = null;
+/* -------- Events (pointer + touch 両方付ける) -------- */
 
+// Pointer (desktop / many mobiles)
+let pid = null;
 hit.addEventListener("pointerdown", (e) => {
   e.preventDefault();
   pid = e.pointerId;
-  hit.setPointerCapture(pid);
-  updateFromEvent(e);
-  armAndStart();
+  try { hit.setPointerCapture(pid); } catch(_){}
+  updateFromClientXY(e.clientX, e.clientY);
+  startAudioGesture();
 }, {passive:false});
 
 hit.addEventListener("pointermove", (e) => {
   if (!holding) return;
   if (pid !== null && e.pointerId !== pid) return;
   e.preventDefault();
-  updateFromEvent(e);
+  updateFromClientXY(e.clientX, e.clientY);
 }, {passive:false});
 
 hit.addEventListener("pointerup", (e) => {
@@ -377,14 +351,39 @@ hit.addEventListener("pointercancel", (e) => {
   stop();
 }, {passive:false});
 
+// Touch fallback (iOSでpointerが死ぬ個体への保険)
+hit.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  if (!t) return;
+  updateFromClientXY(t.clientX, t.clientY);
+  startAudioGesture();
+}, {passive:false});
+
+hit.addEventListener("touchmove", (e) => {
+  if (!holding) return;
+  e.preventDefault();
+  const t = e.touches[0];
+  if (!t) return;
+  updateFromClientXY(t.clientX, t.clientY);
+}, {passive:false});
+
+hit.addEventListener("touchend", (e) => {
+  e.preventDefault();
+  stop();
+}, {passive:false});
+
+hit.addEventListener("touchcancel", (e) => {
+  e.preventDefault();
+  stop();
+}, {passive:false});
+
 // Safety
 window.addEventListener("blur", stop);
 document.addEventListener("visibilitychange", () => { if (document.hidden) stop(); });
 
-// Init dot position
-(function init(){
-  applyXY();
-})();
+// init dot
+applyXY();
 </script>
 </body>
 </html>

@@ -12,13 +12,12 @@
   <style>
     :root{
       --grid: 22px;                    /* square grid size */
-      --bg0: #04061a;                  /* dark-blue base */
-      --bg1: #020314;                  /* deeper */
-      --paper:#b9bcc4;                 /* matte gray */
+      --bg: #050724;                   /* solid dark blue */
+
+      --paper:#b9bcc4;                 /* matte gray panel */
       --paper2:#aeb2bc;
 
-      --line: rgba(0,0,255,.16);       /* grid thinner */
-      --lineCenter: rgba(0,0,255,.46); /* center cross */
+      --line: rgba(0,0,255,.16);       /* grid lines */
       --lineStrong: rgba(0,0,255,.92); /* border */
       --shadow: rgba(0,0,0,.62);
 
@@ -27,16 +26,13 @@
 
     *{box-sizing:border-box}
     html,body{height:100%}
+
     body{
       margin:0;
       min-height:100vh;
       display:grid;
       place-items:center;
-      background:
-        radial-gradient(1200px 800px at 20% 10%, rgba(0,0,255,.22), transparent 62%),
-        radial-gradient(1000px 760px at 85% 95%, rgba(0,0,255,.18), transparent 65%),
-        radial-gradient(700px 500px at 55% 55%, rgba(0,0,255,.08), transparent 62%),
-        linear-gradient(180deg, var(--bg0) 0%, var(--bg1) 100%);
+      background: var(--bg);
       overscroll-behavior:none;
     }
 
@@ -64,30 +60,19 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* draw grid + center cross in SAME layer (eliminates drift) */
+    /* square symmetric grid ONLY (no center cross) */
     .pad::before{
       content:"";
       position:absolute;
       inset:0;
       background:
-        /* center cross */
-        linear-gradient(0deg,
-          transparent calc(50% - .5px),
-          var(--lineCenter) 50%,
-          transparent calc(50% + .5px)
-        ),
-        linear-gradient(90deg,
-          transparent calc(50% - .5px),
-          var(--lineCenter) 50%,
-          transparent calc(50% + .5px)
-        ),
-        /* fine square grid */
         repeating-linear-gradient(0deg,  var(--line) 0 1px, transparent 1px var(--grid)),
         repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px var(--grid));
-      opacity:1;
       pointer-events:none;
+      opacity:1;
     }
 
+    /* subtle tint slab */
     .slab{
       position:absolute;
       left:-80px;
@@ -113,7 +98,7 @@
       font-weight:200;
       letter-spacing:3.5px;
       text-transform: lowercase;
-      font-size:15px;                  /* bigger */
+      font-size:15px;
       color: var(--txt);
       user-select:none;
       -webkit-user-select:none;
@@ -160,34 +145,16 @@
   </div>
 
 <script>
-/* ====== VISUAL: snap pad size to (2*grid) so center aligns to grid line ====== */
-(function snapToGrid(){
-  const wrap = document.getElementById("wrap");
-  const pad  = document.getElementById("pad");
+/* =========================================================
+   YORU NO TSUSHIN — WebAudio XY pad
+   - Hold to transmit
+   - Y: pitch (up=high)
+   - X: interval speed (right=fast)
+   - Normal: sine busy-tone on random note (F A C E G)
+   - Bug A: 1/15 noise mode (3 types) while held @20%
+   - Bug B: 1/12 “SF UI beep” one-shot (5 types) @20%
+========================================================= */
 
-  function getGridPx(){
-    const v = getComputedStyle(document.documentElement).getPropertyValue("--grid").trim();
-    const n = parseFloat(v);
-    return Number.isFinite(n) ? n : 22;
-  }
-
-  function snap(){
-    const g = getGridPx();
-    const step = g * 2; // IMPORTANT: center line will be on a grid line only if size is multiple of 2*grid
-    const r = wrap.getBoundingClientRect();
-
-    const w = Math.max(step * 4, Math.floor(r.width  / step) * step);
-    const h = Math.max(step * 4, Math.floor(r.height / step) * step);
-
-    pad.style.width  = w + "px";
-    pad.style.height = h + "px";
-  }
-
-  window.addEventListener("resize", snap, {passive:true});
-  snap();
-})();
-
-/* ====== AUDIO (same spec) ====== */
 let ctx, master, gate;
 let osc, oscGain;
 let lfo, shaper, lfoDepth;
@@ -202,21 +169,25 @@ const pad = document.getElementById("pad");
 const hit = document.getElementById("hit");
 const dot = document.getElementById("dot");
 
+/* timing */
 const MIN_MS = 160;
 const MAX_MS = 900;
 
-const MASTER_LEVEL = 0.096;
-const BUG_LEVEL = 0.20;
+/* levels */
+const MASTER_LEVEL = 0.096;  // overall level
+const BUG_LEVEL = 0.20;      // glitch/noise one-shots bus
 
+/* probabilities */
 const NOISE_PROB  = 1/15;
 const GLITCH_PROB = 1/12;
 
+/* chord tones: Fmaj7(9) = F A C E G */
 const MID = [
-  { hz: 349.228 }, // F
-  { hz: 440.000 }, // A
-  { hz: 523.251 }, // C
-  { hz: 659.255 }, // E
-  { hz: 783.991 }, // G
+  { hz: 349.228 }, // F4
+  { hz: 440.000 }, // A4
+  { hz: 523.251 }, // C5
+  { hz: 659.255 }, // E5
+  { hz: 783.991 }, // G5
 ];
 
 let current = MID[0];
@@ -229,7 +200,7 @@ function pickRandomNote(){ return MID[(Math.random() * MID.length) | 0]; }
 
 function yToMult(y){ return 2.0 - 1.5 * y; }                 // top high
 function xToMs(x){ return MAX_MS - (MAX_MS - MIN_MS) * x; }  // right fast
-function msToLfoHz(ms){ return 500 / ms; }
+function msToLfoHz(ms){ return 500 / ms; }                   // 50% duty-ish
 
 function ensureAudio(){
   if (ctx) return;
@@ -252,6 +223,7 @@ function ensureAudio(){
   glitchBus.gain.value = BUG_LEVEL;
   glitchBus.connect(master);
 
+  /* main oscillator */
   osc = ctx.createOscillator();
   osc.type = "sine";
   osc.frequency.value = current.hz;
@@ -263,6 +235,7 @@ function ensureAudio(){
 
   osc.start();
 
+  /* gating LFO (square -> waveshaper -> gate.gain) */
   lfo = ctx.createOscillator();
   lfo.type = "square";
   lfo.frequency.value = msToLfoHz(xToMs(x01));
@@ -317,12 +290,12 @@ function applyXY(){
   const mult = yToMult(y01);
   const ms = xToMs(x01);
 
-  const det = 1 + (Math.random()*0.002 - 0.001);
+  const det = 1 + (Math.random()*0.002 - 0.001); // micro drift
   osc.frequency.value = (current.hz * mult) * det;
   lfo.frequency.value = msToLfoHz(ms);
 }
 
-/* noise buffers */
+/* ------------------ noise buffers (3 types) ------------------ */
 function makeWhiteBuffer(seconds=2){
   const len = Math.floor(ctx.sampleRate * seconds);
   const buf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -368,6 +341,7 @@ function ensureNoiseBuffers(){
   pinkBuf  = makePinkishBuffer(2);
   digiBuf  = makeDigitalBuffer(2);
 }
+
 function startNoise(type){
   ensureNoiseBuffers();
   stopNoise();
@@ -384,68 +358,162 @@ function stopNoise(){
   noiseSrc = null;
 }
 
-/* pip/keen one-shots */
+/* ------------------ SF UI beeps (beeper2-ish vibe) ------------------ */
 function playGlitchOneShot(type){
+  if (!ctx) return;
   const now = ctx.currentTime;
 
+  // output gain (already scaled by glitchBus = BUG_LEVEL)
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.0, now);
   g.connect(glitchBus);
 
-  const o = ctx.createOscillator();
-  o.type = "sine";
-  o.connect(g);
-
-  function stopAt(tEnd){
-    g.gain.linearRampToValueAtTime(0.0, tEnd);
+  function cleanup(at){
+    g.gain.linearRampToValueAtTime(0.0, at);
     setTimeout(() => {
-      try{ o.stop(); }catch(e){}
-      try{ o.disconnect(); }catch(e){}
-      try{ g.disconnect(); }catch(e){}
-    }, Math.max(0, (tEnd - now) * 1000 + 50));
+      try { g.disconnect(); } catch(e){}
+    }, Math.max(0, (at - now) * 1000 + 80));
   }
 
+  // click transient (noise tick)
+  const click = ctx.createBufferSource();
+  const clickBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.02), ctx.sampleRate);
+  const cd = clickBuf.getChannelData(0);
+  for (let i=0;i<cd.length;i++){
+    const t = i / cd.length;
+    cd[i] = (Math.random()*2-1) * Math.exp(-t*18);
+  }
+  click.buffer = clickBuf;
+
+  const bp = ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.setValueAtTime(2200, now);
+  bp.Q.setValueAtTime(10, now);
+
+  const clickGain = ctx.createGain();
+  clickGain.gain.setValueAtTime(0.0, now);
+  clickGain.gain.linearRampToValueAtTime(0.45, now + 0.001);
+  clickGain.gain.exponentialRampToValueAtTime(0.0008, now + 0.018);
+
+  click.connect(bp);
+  bp.connect(clickGain);
+  clickGain.connect(g);
+
+  // main tone: two-osc stack + subtle FM
+  const o1 = ctx.createOscillator();
+  const o2 = ctx.createOscillator();
+  o1.type = "sine";
+  o2.type = "triangle";
+
+  const fm = ctx.createOscillator();
+  fm.type = "sine";
+  const fmGain = ctx.createGain();
+  fmGain.gain.setValueAtTime(0.0, now);
+
+  fm.connect(fmGain);
+  fmGain.connect(o1.frequency);
+
+  const toneGain = ctx.createGain();
+  toneGain.gain.setValueAtTime(1.0, now);
+  toneGain.connect(g);
+
+  o1.connect(toneGain);
+  o2.connect(toneGain);
+
+  // master envelope (snappy)
+  const A = 0.002, D = 0.060;
+  g.gain.linearRampToValueAtTime(1.0, now + A);
+  g.gain.exponentialRampToValueAtTime(0.0008, now + A + D);
+
+  const end = now + 0.14;
+
+  // 5 families
   if (type === 0){
-    o.frequency.setValueAtTime(6200, now);
-    o.start(now);
-    g.gain.linearRampToValueAtTime(1.0, now + 0.0015);
-    stopAt(now + 0.030);
-    return;
-  }
-  if (type === 1){
-    o.frequency.setValueAtTime(3800, now);
-    o.start(now);
-    g.gain.linearRampToValueAtTime(1.0, now + 0.0015);
-    stopAt(now + 0.070);
-    return;
-  }
-  if (type === 2){
-    o.frequency.setValueAtTime(1800, now);
-    o.frequency.exponentialRampToValueAtTime(9200, now + 0.055);
-    o.start(now);
-    g.gain.linearRampToValueAtTime(1.0, now + 0.0015);
-    stopAt(now + 0.070);
-    return;
-  }
-  if (type === 3){
-    o.frequency.setValueAtTime(9400, now);
-    o.frequency.exponentialRampToValueAtTime(2200, now + 0.050);
-    o.start(now);
-    g.gain.linearRampToValueAtTime(1.0, now + 0.0015);
-    stopAt(now + 0.065);
-    return;
+    // Up-chirp “pip”
+    o1.frequency.setValueAtTime(1800, now);
+    o1.frequency.exponentialRampToValueAtTime(8200, now + 0.060);
+    o2.frequency.setValueAtTime(1200, now);
+    o2.frequency.exponentialRampToValueAtTime(3600, now + 0.060);
+    fm.frequency.setValueAtTime(70, now);
+    fmGain.gain.setValueAtTime(55, now);
+    cleanup(now + 0.080);
+
+  } else if (type === 1){
+    // Down-chirp “keen”
+    o1.frequency.setValueAtTime(9500, now);
+    o1.frequency.exponentialRampToValueAtTime(2600, now + 0.055);
+    o2.frequency.setValueAtTime(4800, now);
+    o2.frequency.exponentialRampToValueAtTime(1600, now + 0.055);
+    fm.frequency.setValueAtTime(55, now);
+    fmGain.gain.setValueAtTime(40, now);
+    cleanup(now + 0.075);
+
+  } else if (type === 2){
+    // Double-beep pulses
+    o1.frequency.setValueAtTime(5200, now);
+    o2.frequency.setValueAtTime(2600, now);
+
+    toneGain.gain.setValueAtTime(0.0, now);
+    toneGain.gain.linearRampToValueAtTime(1.0, now + 0.002);
+    toneGain.gain.exponentialRampToValueAtTime(0.001, now + 0.028);
+
+    toneGain.gain.setValueAtTime(0.0, now + 0.040);
+    toneGain.gain.linearRampToValueAtTime(1.0, now + 0.042);
+    toneGain.gain.exponentialRampToValueAtTime(0.001, now + 0.070);
+
+    fm.frequency.setValueAtTime(90, now);
+    fmGain.gain.setValueAtTime(20, now);
+    cleanup(now + 0.090);
+
+  } else if (type === 3){
+    // Confirm blip (wobble)
+    o1.frequency.setValueAtTime(3400, now);
+    o1.frequency.linearRampToValueAtTime(3800, now + 0.018);
+    o1.frequency.linearRampToValueAtTime(3300, now + 0.045);
+
+    o2.frequency.setValueAtTime(1700, now);
+    o2.frequency.linearRampToValueAtTime(1900, now + 0.018);
+    o2.frequency.linearRampToValueAtTime(1650, now + 0.045);
+
+    fm.frequency.setValueAtTime(120, now);
+    fmGain.gain.setValueAtTime(35, now);
+    cleanup(now + 0.070);
+
+  } else {
+    // Scan/error micro-sweep (extra tick)
+    bp.frequency.setValueAtTime(2800, now);
+    bp.frequency.linearRampToValueAtTime(1400, now + 0.020);
+
+    o1.frequency.setValueAtTime(2400, now);
+    o1.frequency.exponentialRampToValueAtTime(7200, now + 0.040);
+    o2.frequency.setValueAtTime(900, now);
+    o2.frequency.exponentialRampToValueAtTime(2100, now + 0.040);
+
+    fm.frequency.setValueAtTime(45, now);
+    fmGain.gain.setValueAtTime(75, now);
+    cleanup(now + 0.085);
   }
 
-  o.frequency.setValueAtTime(5400, now);
-  o.start(now);
-  g.gain.linearRampToValueAtTime(1.0, now + 0.0015);
-  g.gain.linearRampToValueAtTime(0.0, now + 0.020);
-  g.gain.setValueAtTime(0.0, now + 0.028);
-  g.gain.linearRampToValueAtTime(1.0, now + 0.030);
-  g.gain.linearRampToValueAtTime(0.0, now + 0.050);
-  stopAt(now + 0.055);
+  // start/stop
+  click.start(now);
+  fm.start(now);
+  o1.start(now);
+  o2.start(now);
+
+  setTimeout(() => {
+    try { click.stop(); } catch(e){}
+    try { fm.stop(); } catch(e){}
+    try { o1.stop(); } catch(e){}
+    try { o2.stop(); } catch(e){}
+    try { click.disconnect(); } catch(e){}
+    try { bp.disconnect(); } catch(e){}
+    try { clickGain.disconnect(); } catch(e){}
+    try { fmGain.disconnect(); } catch(e){}
+    try { toneGain.disconnect(); } catch(e){}
+  }, Math.max(0, (end - now) * 1000 + 90));
 }
 
+/* ------------------ start/stop + pointer ------------------ */
 function startAudioGesture(){
   ensureAudio();
   unlockIOSOnce();
@@ -458,10 +526,12 @@ function startAudioGesture(){
 
     current = pickRandomNote();
 
+    // random SF beep one-shot
     if (Math.random() < GLITCH_PROB){
       playGlitchOneShot((Math.random()*5)|0);
     }
 
+    // random noise “bug” while held
     const bugMode = (Math.random() < NOISE_PROB);
     const bugType = (Math.random()*3)|0;
 
@@ -502,7 +572,6 @@ function updateFromClientXY(clientX, clientY){
   applyXY();
 }
 
-/* pointer + touch */
 let pid = null;
 
 hit.addEventListener("pointerdown", (e) => {
@@ -533,6 +602,7 @@ hit.addEventListener("pointercancel", (e) => {
   stop();
 }, {passive:false});
 
+/* iOS Safari sometimes prefers touch events too */
 hit.addEventListener("touchstart", (e) => {
   e.preventDefault();
   const t = e.touches[0];

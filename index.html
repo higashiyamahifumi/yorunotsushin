@@ -12,124 +12,221 @@
 
   <style>
     :root{
-      --bg0:#05070c;
-      --bg1:#070b12;
-      --shell0:#07101e;
-      --shell1:#06101a;
-      --edge:#13233a;
-
-      --text:#d7deea;
-      --ind:#9fe3b6;
-
-      --shadow: rgba(0,0,0,.70);
+      --blue:#1348ff;
+      --blue2:#0b2ea7;
+      --ink:#0a0d14;
+      --paper:#b9bcc4;        /* matte gray */
+      --paper2:#aeb2bc;
+      --line: rgba(19,72,255,.85);
+      --lineSoft: rgba(19,72,255,.22);
+      --shadow: rgba(0,0,0,.35);
+      --white: rgba(255,255,255,.92);
     }
+
     *{box-sizing:border-box}
-    html, body { height:100%; }
+    html,body{height:100%}
     body{
       margin:0;
       min-height:100vh;
       display:grid;
       place-items:center;
       background:
-        radial-gradient(900px 540px at 55% 10%, rgba(255,255,255,.05), transparent 60%),
-        radial-gradient(1000px 700px at 40% 120%, rgba(255,255,255,.03), transparent 58%),
-        linear-gradient(180deg, var(--bg1) 0%, var(--bg0) 100%);
+        radial-gradient(1200px 700px at 30% 20%, rgba(19,72,255,.10), transparent 60%),
+        radial-gradient(1000px 650px at 70% 90%, rgba(19,72,255,.08), transparent 62%),
+        linear-gradient(180deg, #070a10 0%, #05070c 100%);
+      color: var(--white);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-      letter-spacing:.45px;
-      color: var(--text);
-      overscroll-behavior: none;
+      overscroll-behavior:none;
     }
 
-    .wrap{width:min(860px, 94vw); padding:22px;}
-    .unit{
-      background: linear-gradient(180deg, var(--shell0) 0%, var(--shell1) 100%);
-      border: 1px solid var(--edge);
-      border-radius: 16px;
-      box-shadow:
-        0 22px 60px var(--shadow),
-        inset 0 1px 0 rgba(255,255,255,.05);
+    .wrap{
+      width:min(980px, 96vw);
+      padding:18px;
+    }
+
+    .frame{
+      position:relative;
+      border:1px solid rgba(19,72,255,.35);
+      border-radius:14px;
       overflow:hidden;
+      box-shadow: 0 22px 70px rgba(0,0,0,.55);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.22)),
+        linear-gradient(90deg, rgba(0,0,0,.20), transparent 40%, rgba(0,0,0,.28));
     }
 
-    .top{
-      padding:16px;
-      border-bottom:1px solid rgba(19,35,58,.9);
+    /* outer grid like reference */
+    .frame::before{
+      content:"";
+      position:absolute;
+      inset:0;
       background:
-        linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,0) 70%),
-        linear-gradient(90deg, rgba(0,0,0,.25), transparent 45%, rgba(0,0,0,.35));
+        repeating-linear-gradient(0deg,  rgba(19,72,255,.18) 0 1px, transparent 1px 70px),
+        repeating-linear-gradient(90deg, rgba(19,72,255,.18) 0 1px, transparent 1px 120px);
+      opacity:.65;
+      pointer-events:none;
+      mix-blend-mode: screen;
+    }
+
+    /* big abstract typographic slab (no numbers) */
+    .frame::after{
+      content:"/n/";
+      position:absolute;
+      left:-40px;
+      bottom:-120px;
+      font-family: "Oxanium", ui-monospace, monospace;
+      font-weight:300;
+      letter-spacing:-8px;
+      font-size:min(46vw, 560px);
+      color: rgba(19,72,255,.55);
+      transform: skewX(-10deg);
+      pointer-events:none;
+      opacity:.22;
+      filter: blur(.2px);
+    }
+
+    .topbar{
+      position:relative;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:14px 16px;
+      border-bottom:2px solid rgba(19,72,255,.65);
+      background:
+        linear-gradient(180deg, rgba(185,188,196,.10), rgba(0,0,0,.15));
     }
 
     .title{
-      font-family: "Oxanium", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-      font-size:16px;
+      font-family:"Oxanium", ui-monospace, monospace;
       font-weight:200;
-      letter-spacing:3.6px;
-      color: rgba(215,222,234,.88);
+      letter-spacing:4px;
+      text-transform: lowercase;
+      font-size:14px;
+      color: rgba(255,255,255,.92);
       user-select:none;
       -webkit-user-select:none;
-      text-transform: lowercase;
     }
 
-    .mid{
-      padding:16px;
-      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(0,0,0,.24));
+    /* tiny indicator bars (no digits) */
+    .indicators{
+      margin-left:auto;
+      display:flex;
+      gap:6px;
+      opacity:.8;
+    }
+    .bar{
+      width:16px;
+      height:2px;
+      background: rgba(19,72,255,.75);
+      box-shadow: 0 0 10px rgba(19,72,255,.12);
+    }
+    .bar.dim{ opacity:.35; }
+
+    .gridArea{
+      display:grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap:0;
+      background: transparent;
     }
 
+    /* left big panel */
+    .left{
+      position:relative;
+      padding:14px;
+      border-right:2px solid rgba(19,72,255,.65);
+      background:
+        linear-gradient(180deg, rgba(185,188,196,.08), rgba(0,0,0,.22));
+    }
+
+    /* right stacked panels like DIV blocks */
+    .right{
+      display:grid;
+      grid-template-rows: 1fr 1fr;
+    }
+    .cell{
+      position:relative;
+      padding:12px;
+      border-bottom:2px solid rgba(19,72,255,.65);
+      background:
+        linear-gradient(180deg, rgba(185,188,196,.06), rgba(0,0,0,.20));
+    }
+    .cell:last-child{ border-bottom:none; }
+
+    /* ascii texture (no numbers) */
+    .ascii{
+      position:absolute;
+      inset:10px 10px auto 10px;
+      height:120px;
+      overflow:hidden;
+      opacity:.22;
+      color: rgba(255,255,255,.85);
+      font-size:12px;
+      line-height:12px;
+      white-space:pre;
+      pointer-events:none;
+      filter: blur(.15px);
+    }
+    .ascii.bottom{
+      inset:auto 10px 10px 10px;
+      height:110px;
+      opacity:.16;
+    }
+
+    /* XY pad */
     .padPlate{
       width:100%;
-      height:min(62vh, 520px);
-      border-radius:16px;
-      border:1px solid rgba(255,255,255,.05);
-      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(0,0,0,.22));
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+      height:min(62vh, 560px);
+      border-radius:12px;
+      background:
+        linear-gradient(180deg, rgba(185,188,196,.90), rgba(174,178,188,.88));
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.35),
+        inset 0 -1px 0 rgba(0,0,0,.18),
+        0 20px 60px rgba(0,0,0,.28);
+      border:2px solid rgba(19,72,255,.85);
       position:relative;
       overflow:hidden;
-
       touch-action:none;
       -webkit-tap-highlight-color: transparent;
     }
+
+    /* inner grid + div lines */
     .padPlate::before{
       content:"";
       position:absolute;
       inset:0;
       background:
-        linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px);
-      background-size: 16px 16px;
-      opacity:.18;
+        repeating-linear-gradient(0deg,  rgba(19,72,255,.22) 0 1px, transparent 1px 40px),
+        repeating-linear-gradient(90deg, rgba(19,72,255,.22) 0 1px, transparent 1px 64px);
+      opacity:.95;
       pointer-events:none;
     }
-    .vline{
+    .padPlate::after{
+      content:"";
       position:absolute;
-      left:50%; top:0;
-      width:1px; height:100%;
-      background: rgba(255,255,255,.08);
-      transform:translateX(-50%);
+      inset:0;
+      background:
+        linear-gradient(0deg, transparent 49.5%, rgba(19,72,255,.45) 50%, transparent 50.5%),
+        linear-gradient(90deg, transparent 49.5%, rgba(19,72,255,.45) 50%, transparent 50.5%);
       pointer-events:none;
-    }
-    .hline{
-      position:absolute;
-      left:0; top:50%;
-      width:100%; height:1px;
-      background: rgba(255,255,255,.08);
-      transform:translateY(-50%);
-      pointer-events:none;
+      opacity:.55;
     }
 
+    /* cursor dot */
     .dot{
       position:absolute;
-      width:14px; height:14px;
+      width:12px; height:12px;
       border-radius:999px;
-      background: rgba(159,227,182,.70);
-      border:1px solid rgba(159,227,182,.35);
-      box-shadow: 0 0 10px rgba(159,227,182,.18);
+      background: rgba(19,72,255,.92);
+      box-shadow: 0 0 14px rgba(19,72,255,.25);
+      border:1px solid rgba(255,255,255,.35);
       transform: translate(-50%,-50%);
       pointer-events:none;
-      opacity:.9;
+      opacity:.95;
     }
     .dot.off{
-      opacity:.25;
-      background: rgba(159,227,182,.18);
+      opacity:.30;
+      background: rgba(19,72,255,.35);
       box-shadow:none;
     }
 
@@ -137,26 +234,88 @@
       position:absolute;
       inset:0;
       display:block;
+      background: transparent;
       touch-action:none;
       -webkit-tap-highlight-color: transparent;
-      background: transparent;
+    }
+
+    /* subtle caption (no numbers) */
+    .tag{
+      position:absolute;
+      right:12px;
+      top:12px;
+      font-family:"Oxanium", ui-monospace, monospace;
+      font-weight:200;
+      letter-spacing:3px;
+      font-size:11px;
+      color: rgba(0,0,0,.35);
+      mix-blend-mode:multiply;
+      user-select:none;
+      -webkit-user-select:none;
+      pointer-events:none;
+    }
+
+    /* mobile spacing */
+    @media (max-width: 860px){
+      .gridArea{ grid-template-columns: 1fr; }
+      .left{ border-right:none; border-bottom:2px solid rgba(19,72,255,.65); }
+      .padPlate{ height:min(68vh, 600px); }
     }
   </style>
 </head>
 
 <body>
   <div class="wrap">
-    <div class="unit">
-      <div class="top">
+    <div class="frame">
+      <div class="topbar">
         <div class="title">yoru no tsushin</div>
+        <div class="indicators" aria-hidden="true">
+          <div class="bar"></div>
+          <div class="bar dim"></div>
+          <div class="bar dim"></div>
+        </div>
       </div>
 
-      <div class="mid">
-        <div class="padPlate" id="pad">
-          <div class="vline"></div>
-          <div class="hline"></div>
-          <div class="dot off" id="dot"></div>
-          <div class="padHit" id="hit" aria-label="XY pad"></div>
+      <div class="gridArea">
+        <div class="left">
+          <div class="ascii" aria-hidden="true">
+/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\
+|  \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \  |
+|   \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \   |
+|----\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-|
+|    | | | | | | | | | | | | | | | | | | | | | | | |    |
+\_______________________________________________________/
+          </div>
+
+          <div class="padPlate" id="pad">
+            <div class="tag" aria-hidden="true">transceiver</div>
+            <div class="dot off" id="dot"></div>
+            <div class="padHit" id="hit" aria-label="XY pad"></div>
+          </div>
+
+          <div class="ascii bottom" aria-hidden="true">
+|/////|\\\\\|/////|\\\\\|/////|\\\\\|/////|\\\\\|/////|
+|_____|_____|_____|_____|_____|_____|_____|_____|_____|
+|  / / / / / / / / / / / / / / / / / / / / / / / /   |
+|_/__/__/__/__/__/__/__/__/__/__/__/__/__/__/__/__/___|
+          </div>
+        </div>
+
+        <div class="right">
+          <div class="cell">
+            <div class="ascii" aria-hidden="true">
+|-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\|
+|  ||  ||  ||  ||  ||  ||  ||  ||  ||  ||  ||  ||     |
+|_/__\_/__\_/__\_/__\_/__\_/__\_/__\_/__\_/__\_/__\____|
+            </div>
+          </div>
+          <div class="cell">
+            <div class="ascii bottom" aria-hidden="true">
+\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \
+- - - - - - - - - - - - - - - - - - - - - - - - - - - -
+/_/ /_/ /_/ /_/ /_/ /_/ /_/ /_/ /_/ /_/ /_/ /_/ /_/ /_/
+            </div>
+          </div>
         </div>
       </div>
     </div>

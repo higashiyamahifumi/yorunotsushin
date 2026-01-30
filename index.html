@@ -11,17 +11,17 @@
 
   <style>
     :root{
-      --grid: 22px;                    /* square grid size */
-      --bg: #050724;                   /* solid dark blue */
+      --grid: 22px;
+      --bg: #050724;
 
-      --paper:#b9bcc4;                 /* matte gray panel */
+      --paper:#b9bcc4;
       --paper2:#aeb2bc;
 
-      --line: rgba(0,0,255,.16);       /* grid lines */
-      --lineStrong: rgba(0,0,255,.92); /* border */
+      --line: rgba(0,0,255,.16);
+      --lineStrong: rgba(0,0,255,.92);
       --shadow: rgba(0,0,0,.62);
 
-      --txt: rgba(255,255,255,.22);    /* ghost title */
+      --txt: rgba(255,255,255,.22);
     }
 
     *{box-sizing:border-box}
@@ -60,7 +60,6 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* square symmetric grid ONLY (no center cross) */
     .pad::before{
       content:"";
       position:absolute;
@@ -72,7 +71,6 @@
       opacity:1;
     }
 
-    /* subtle tint slab */
     .slab{
       position:absolute;
       left:-80px;
@@ -148,11 +146,8 @@
 /* =========================================================
    YORU NO TSUSHIN — WebAudio XY pad
    - Hold to transmit
-   - Y: pitch (up=high)
-   - X: interval speed (right=fast)
-   - Normal: sine busy-tone on random note (F A C E G)
-   - Bug A: 1/15 noise mode (3 types) while held @20%
-   - Bug B: 1/12 “SF UI beep” one-shot (5 types) @20%
+   - Y: pitch (up=high)  [WIDER RANGE]
+   - X: interval speed (right=fast) [WIDER RANGE]
 ========================================================= */
 
 let ctx, master, gate;
@@ -169,13 +164,17 @@ const pad = document.getElementById("pad");
 const hit = document.getElementById("hit");
 const dot = document.getElementById("dot");
 
-/* timing */
-const MIN_MS = 160;
-const MAX_MS = 900;
+/* ===== WIDER RANGES ===== */
+const MIN_MS = 60;    // was 160
+const MAX_MS = 1800;  // was 900
+
+// Pitch multiplier range (bottom ~0.35x, top ~3.0x)
+const PITCH_MIN_MULT = 0.35;
+const PITCH_MAX_MULT = 3.00;
 
 /* levels */
-const MASTER_LEVEL = 0.096;  // overall level
-const BUG_LEVEL = 0.20;      // glitch/noise one-shots bus
+const MASTER_LEVEL = 0.096;
+const BUG_LEVEL = 0.20;
 
 /* probabilities */
 const NOISE_PROB  = 1/15;
@@ -198,9 +197,25 @@ let holding = false;
 function clamp01(v){ return Math.max(0, Math.min(1, v)); }
 function pickRandomNote(){ return MID[(Math.random() * MID.length) | 0]; }
 
-function yToMult(y){ return 2.0 - 1.5 * y; }                 // top high
-function xToMs(x){ return MAX_MS - (MAX_MS - MIN_MS) * x; }  // right fast
-function msToLfoHz(ms){ return 500 / ms; }                   // 50% duty-ish
+/* Map Y to pitch multiplier with more dramatic curve:
+   y=0(top)->max, y=1(bottom)->min
+   Use exponential curve for more musical feel */
+function yToMult(y){
+  const t = 1 - y; // top=1
+  // exponential-ish curve: emphasize extremes slightly
+  const shaped = Math.pow(t, 1.15);
+  return PITCH_MIN_MULT * Math.pow(PITCH_MAX_MULT / PITCH_MIN_MULT, shaped);
+}
+
+/* Map X to interval ms (right fast) with curve */
+function xToMs(x){
+  // x=1 => fast => MIN_MS
+  // x=0 => slow => MAX_MS
+  const shaped = Math.pow(1 - x, 1.25); // make left slower more dramatic
+  return MIN_MS + (MAX_MS - MIN_MS) * shaped;
+}
+
+function msToLfoHz(ms){ return 500 / ms; }
 
 function ensureAudio(){
   if (ctx) return;
@@ -223,7 +238,6 @@ function ensureAudio(){
   glitchBus.gain.value = BUG_LEVEL;
   glitchBus.connect(master);
 
-  /* main oscillator */
   osc = ctx.createOscillator();
   osc.type = "sine";
   osc.frequency.value = current.hz;
@@ -235,7 +249,6 @@ function ensureAudio(){
 
   osc.start();
 
-  /* gating LFO (square -> waveshaper -> gate.gain) */
   lfo = ctx.createOscillator();
   lfo.type = "square";
   lfo.frequency.value = msToLfoHz(xToMs(x01));
@@ -290,7 +303,7 @@ function applyXY(){
   const mult = yToMult(y01);
   const ms = xToMs(x01);
 
-  const det = 1 + (Math.random()*0.002 - 0.001); // micro drift
+  const det = 1 + (Math.random()*0.002 - 0.001);
   osc.frequency.value = (current.hz * mult) * det;
   lfo.frequency.value = msToLfoHz(ms);
 }
@@ -363,19 +376,15 @@ function playGlitchOneShot(type){
   if (!ctx) return;
   const now = ctx.currentTime;
 
-  // output gain (already scaled by glitchBus = BUG_LEVEL)
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.0, now);
   g.connect(glitchBus);
 
   function cleanup(at){
     g.gain.linearRampToValueAtTime(0.0, at);
-    setTimeout(() => {
-      try { g.disconnect(); } catch(e){}
-    }, Math.max(0, (at - now) * 1000 + 80));
+    setTimeout(() => { try { g.disconnect(); } catch(e){} }, Math.max(0, (at - now) * 1000 + 80));
   }
 
-  // click transient (noise tick)
   const click = ctx.createBufferSource();
   const clickBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.02), ctx.sampleRate);
   const cd = clickBuf.getChannelData(0);
@@ -399,7 +408,6 @@ function playGlitchOneShot(type){
   bp.connect(clickGain);
   clickGain.connect(g);
 
-  // main tone: two-osc stack + subtle FM
   const o1 = ctx.createOscillator();
   const o2 = ctx.createOscillator();
   o1.type = "sine";
@@ -420,16 +428,13 @@ function playGlitchOneShot(type){
   o1.connect(toneGain);
   o2.connect(toneGain);
 
-  // master envelope (snappy)
   const A = 0.002, D = 0.060;
   g.gain.linearRampToValueAtTime(1.0, now + A);
   g.gain.exponentialRampToValueAtTime(0.0008, now + A + D);
 
   const end = now + 0.14;
 
-  // 5 families
   if (type === 0){
-    // Up-chirp “pip”
     o1.frequency.setValueAtTime(1800, now);
     o1.frequency.exponentialRampToValueAtTime(8200, now + 0.060);
     o2.frequency.setValueAtTime(1200, now);
@@ -439,7 +444,6 @@ function playGlitchOneShot(type){
     cleanup(now + 0.080);
 
   } else if (type === 1){
-    // Down-chirp “keen”
     o1.frequency.setValueAtTime(9500, now);
     o1.frequency.exponentialRampToValueAtTime(2600, now + 0.055);
     o2.frequency.setValueAtTime(4800, now);
@@ -449,7 +453,6 @@ function playGlitchOneShot(type){
     cleanup(now + 0.075);
 
   } else if (type === 2){
-    // Double-beep pulses
     o1.frequency.setValueAtTime(5200, now);
     o2.frequency.setValueAtTime(2600, now);
 
@@ -466,7 +469,6 @@ function playGlitchOneShot(type){
     cleanup(now + 0.090);
 
   } else if (type === 3){
-    // Confirm blip (wobble)
     o1.frequency.setValueAtTime(3400, now);
     o1.frequency.linearRampToValueAtTime(3800, now + 0.018);
     o1.frequency.linearRampToValueAtTime(3300, now + 0.045);
@@ -480,7 +482,6 @@ function playGlitchOneShot(type){
     cleanup(now + 0.070);
 
   } else {
-    // Scan/error micro-sweep (extra tick)
     bp.frequency.setValueAtTime(2800, now);
     bp.frequency.linearRampToValueAtTime(1400, now + 0.020);
 
@@ -494,7 +495,6 @@ function playGlitchOneShot(type){
     cleanup(now + 0.085);
   }
 
-  // start/stop
   click.start(now);
   fm.start(now);
   o1.start(now);
@@ -526,12 +526,10 @@ function startAudioGesture(){
 
     current = pickRandomNote();
 
-    // random SF beep one-shot
     if (Math.random() < GLITCH_PROB){
       playGlitchOneShot((Math.random()*5)|0);
     }
 
-    // random noise “bug” while held
     const bugMode = (Math.random() < NOISE_PROB);
     const bugType = (Math.random()*3)|0;
 
@@ -602,7 +600,6 @@ hit.addEventListener("pointercancel", (e) => {
   stop();
 }, {passive:false});
 
-/* iOS Safari sometimes prefers touch events too */
 hit.addEventListener("touchstart", (e) => {
   e.preventDefault();
   const t = e.touches[0];

@@ -4,6 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>YORU NO TSUSHIN</title>
+
+  <!-- Google Font (SF / machine vibe) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+
   <style>
     :root{
       --bg0:#05070c;
@@ -52,11 +58,13 @@
         linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,0) 70%),
         linear-gradient(90deg, rgba(0,0,0,.25), transparent 45%, rgba(0,0,0,.35));
     }
+
     .title{
-      font-size:14px;
+      font-family: "Orbitron", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size:16px;
       font-weight:900;
       text-transform:uppercase;
-      letter-spacing:2.6px;
+      letter-spacing:4px;
       color: rgba(215,222,234,.92);
       user-select:none;
       -webkit-user-select:none;
@@ -80,7 +88,6 @@
       touch-action:none;
       -webkit-tap-highlight-color: transparent;
     }
-
     .padPlate::before{
       content:"";
       position:absolute;
@@ -92,7 +99,6 @@
       opacity:.18;
       pointer-events:none;
     }
-
     .vline{
       position:absolute;
       left:50%; top:0;
@@ -157,7 +163,21 @@
   </div>
 
 <script>
-let ctx, osc, gate, master;
+/*
+  XY mapping (your latest spec):
+  - Y (up/down) = pitch: top high, bottom low
+  - X (left/right) = interval speed: RIGHT fast, LEFT slow
+
+  Sound:
+  - On press: random pick from Fmaj7(9): F A C E G
+  - Busy-tone gating by LFO (square -> shaper -> gate.gain) for stable mobile timing
+  - "Bug": about 1/15 chance per press to output white noise (only while held)
+*/
+
+let ctx, master, gate;
+let osc, oscGain;
+let noiseGain, noiseBuffer, noiseSrc = null;
+
 let lfo, shaper, lfoDepth;
 let iosUnlocked = false;
 
@@ -165,15 +185,11 @@ const pad = document.getElementById("pad");
 const hit = document.getElementById("hit");
 const dot = document.getElementById("dot");
 
-/* Interval range (ms)
-   TOP = FAST (short), BOTTOM = SLOW (long)  ← ★反転
-*/
+/* interval range (ms): RIGHT=FAST, LEFT=SLOW */
 const MIN_MS = 160; // fastest
 const MAX_MS = 900; // slowest
 
-/* Fmaj7(9) chord tones (MID register)
-   F A C E G
-*/
+/* Fmaj7(9): F A C E G (MID register) */
 const MID = [
   { name: "F", hz: 349.228 },
   { name: "A", hz: 440.000 },
@@ -183,26 +199,24 @@ const MID = [
 ];
 
 let current = MID[0];
-let x01 = 0.5;
-let y01 = 0.5;
+let x01 = 0.5; // 0..1
+let y01 = 0.5; // 0..1
 let holding = false;
+let bugMode = false;
 
 function clamp01(v){ return Math.max(0, Math.min(1, v)); }
 function pickRandomNote(){ return MID[(Math.random() * MID.length) | 0]; }
 
-/* X mapping: left low, right high (continuous)
-   We'll map multiplier from 0.5 .. 2.0 across the pad
-*/
-function xToMult(x){
-  return 0.5 + 1.5 * x; // 0.5 (left) -> 2.0 (right)
+/* Y = pitch : top high, bottom low (mult 0.5..2.0) */
+function yToMult(y){
+  // y=0(top)->2.0, y=1(bottom)->0.5
+  return 2.0 - 1.5 * y;
 }
 
-/* Y mapping: top fast, bottom slow  ← ★反転
-   y=0 (top) => MIN_MS
-   y=1 (bottom) => MAX_MS
-*/
-function yToMs(y){
-  return MIN_MS + (MAX_MS - MIN_MS) * y;
+/* X = interval : right fast, left slow */
+function xToMs(x){
+  // x=0(left)->MAX_MS, x=1(right)->MIN_MS
+  return MAX_MS - (MAX_MS - MIN_MS) * x;
 }
 
 /* LFO freq so ON=ms, OFF=ms => full period=2ms => freq=500/ms */
@@ -218,18 +232,39 @@ function ensureAudio(){
   gate = ctx.createGain();
   gate.gain.value = 0.0;
 
+  // source selector gains
+  oscGain = ctx.createGain();
+  oscGain.gain.value = 1.0;
+
+  noiseGain = ctx.createGain();
+  noiseGain.gain.value = 0.0;
+
+  // oscillator (always running)
   osc = ctx.createOscillator();
   osc.type = "sine";
   osc.frequency.value = current.hz;
+  osc.connect(oscGain);
 
-  osc.connect(gate);
+  // mix -> gate -> master -> out
+  oscGain.connect(gate);
+  noiseGain.connect(gate);
   gate.connect(master);
   master.connect(ctx.destination);
+
   osc.start();
 
+  // prebuild white noise buffer (2 seconds loop)
+  const len = ctx.sampleRate * 2;
+  noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < len; i++){
+    data[i] = (Math.random() * 2 - 1);
+  }
+
+  // LFO gate (stable on mobile)
   lfo = ctx.createOscillator();
   lfo.type = "square";
-  lfo.frequency.value = msToLfoHz(yToMs(y01));
+  lfo.frequency.value = msToLfoHz(xToMs(x01));
 
   shaper = ctx.createWaveShaper();
   const N = 1024;
@@ -242,11 +277,12 @@ function ensureAudio(){
   shaper.oversample = "4x";
 
   lfoDepth = ctx.createGain();
-  lfoDepth.gain.value = 0.0;
+  lfoDepth.gain.value = 0.0; // off until holding
 
   lfo.connect(shaper);
   shaper.connect(lfoDepth);
   lfoDepth.connect(gate.gain);
+
   lfo.start();
 }
 
@@ -277,12 +313,34 @@ function applyXY(){
 
   if (!ctx || !osc || !lfo) return;
 
-  const mult = xToMult(x01);     // left low -> right high
-  const ms = yToMs(y01);         // top fast -> bottom slow
+  const mult = yToMult(y01); // pitch from Y
+  const ms = xToMs(x01);     // interval from X
 
+  // oscillator pitch (ignored if bugMode noise is active, but harmless)
   const det = 1 + (Math.random()*0.002 - 0.001);
   osc.frequency.value = (current.hz * mult) * det;
+
+  // gate speed
   lfo.frequency.value = msToLfoHz(ms);
+}
+
+function startNoiseIfNeeded(){
+  if (!ctx) return;
+  if (!noiseSrc){
+    noiseSrc = ctx.createBufferSource();
+    noiseSrc.buffer = noiseBuffer;
+    noiseSrc.loop = true;
+    noiseSrc.connect(noiseGain);
+    noiseSrc.start();
+  }
+}
+
+function stopNoiseIfNeeded(){
+  if (noiseSrc){
+    try{ noiseSrc.stop(); }catch(e){}
+    try{ noiseSrc.disconnect(); }catch(e){}
+    noiseSrc = null;
+  }
 }
 
 function startAudioGesture(){
@@ -295,9 +353,26 @@ function startAudioGesture(){
     holding = true;
     dot.classList.remove("off");
 
-    current = pickRandomNote();  // F A C E G のどれか
+    // choose note on each press
+    current = pickRandomNote();
+
+    // 1/15 "bug" chance
+    bugMode = (Math.random() < (1/15));
+
+    // select source
+    if (bugMode){
+      startNoiseIfNeeded();
+      ramp(oscGain.gain, 0.0, 0.02);
+      ramp(noiseGain.gain, 1.0, 0.02);
+    } else {
+      stopNoiseIfNeeded();
+      ramp(noiseGain.gain, 0.0, 0.02);
+      ramp(oscGain.gain, 1.0, 0.02);
+    }
+
     applyXY();
 
+    // turn on gating + volume
     ramp(lfoDepth.gain, 1.0, 0.02);
     ramp(master.gain, 0.16, 0.02);
   }).catch(()=>{});
@@ -307,8 +382,15 @@ function stop(){
   holding = false;
   dot.classList.add("off");
   if (!ctx) return;
+
+  // fade out
   ramp(lfoDepth.gain, 0.0, 0.03);
   ramp(master.gain, 0.0, 0.05);
+
+  // stop noise after fade so it doesn’t click
+  setTimeout(() => {
+    if (!holding) stopNoiseIfNeeded();
+  }, 120);
 }
 
 function updateFromClientXY(clientX, clientY){
@@ -365,19 +447,13 @@ hit.addEventListener("touchmove", (e) => {
   updateFromClientXY(t.clientX, t.clientY);
 }, {passive:false});
 
-hit.addEventListener("touchend", (e) => {
-  e.preventDefault();
-  stop();
-}, {passive:false});
-
-hit.addEventListener("touchcancel", (e) => {
-  e.preventDefault();
-  stop();
-}, {passive:false});
+hit.addEventListener("touchend", (e) => { e.preventDefault(); stop(); }, {passive:false});
+hit.addEventListener("touchcancel", (e) => { e.preventDefault(); stop(); }, {passive:false});
 
 window.addEventListener("blur", stop);
 document.addEventListener("visibilitychange", () => { if (document.hidden) stop(); });
 
+// initial dot
 applyXY();
 </script>
 </body>

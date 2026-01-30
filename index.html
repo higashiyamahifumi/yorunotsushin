@@ -11,18 +11,18 @@
 
   <style>
     :root{
-      /* tweak here */
-      --grid: 22px;                  /* square grid size */
-      --bg: #070a10;                 /* dark background */
-      --paper:#b9bcc4;               /* matte gray */
+      --grid: 22px;                    /* square grid size */
+      --bg0: #04061a;                  /* dark-blue base */
+      --bg1: #020314;                  /* deeper */
+      --paper:#b9bcc4;                 /* matte gray */
       --paper2:#aeb2bc;
 
-      --line: rgba(0,0,255,.22);     /* grid lines */
-      --lineCenter: rgba(0,0,255,.55);
-      --lineStrong: rgba(0,0,255,.92);
-      --shadow: rgba(0,0,0,.55);
+      --line: rgba(0,0,255,.16);       /* grid thinner */
+      --lineCenter: rgba(0,0,255,.46); /* center cross */
+      --lineStrong: rgba(0,0,255,.92); /* border */
+      --shadow: rgba(0,0,0,.62);
 
-      --txt: rgba(255,255,255,.20); /* ghost title */
+      --txt: rgba(255,255,255,.22);    /* ghost title */
     }
 
     *{box-sizing:border-box}
@@ -33,9 +33,10 @@
       display:grid;
       place-items:center;
       background:
-        radial-gradient(1000px 700px at 30% 20%, rgba(0,0,255,.08), transparent 60%),
-        radial-gradient(900px 650px at 70% 90%, rgba(0,0,255,.06), transparent 62%),
-        linear-gradient(180deg, #070a10 0%, #05070c 100%);
+        radial-gradient(1200px 800px at 20% 10%, rgba(0,0,255,.22), transparent 62%),
+        radial-gradient(1000px 760px at 85% 95%, rgba(0,0,255,.18), transparent 65%),
+        radial-gradient(700px 500px at 55% 55%, rgba(0,0,255,.08), transparent 62%),
+        linear-gradient(180deg, var(--bg0) 0%, var(--bg1) 100%);
       overscroll-behavior:none;
     }
 
@@ -63,31 +64,30 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* square symmetric grid */
+    /* draw grid + center cross in SAME layer (eliminates drift) */
     .pad::before{
       content:"";
       position:absolute;
       inset:0;
       background:
+        /* center cross */
+        linear-gradient(0deg,
+          transparent calc(50% - .5px),
+          var(--lineCenter) 50%,
+          transparent calc(50% + .5px)
+        ),
+        linear-gradient(90deg,
+          transparent calc(50% - .5px),
+          var(--lineCenter) 50%,
+          transparent calc(50% + .5px)
+        ),
+        /* fine square grid */
         repeating-linear-gradient(0deg,  var(--line) 0 1px, transparent 1px var(--grid)),
         repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px var(--grid));
       opacity:1;
       pointer-events:none;
     }
 
-    /* perfect center cross aligned to grid using background-position */
-    .pad::after{
-      content:"";
-      position:absolute;
-      inset:0;
-      background:
-        linear-gradient(0deg, transparent calc(50% - .5px), var(--lineCenter) 50%, transparent calc(50% + .5px)),
-        linear-gradient(90deg, transparent calc(50% - .5px), var(--lineCenter) 50%, transparent calc(50% + .5px));
-      pointer-events:none;
-      opacity:.95;
-    }
-
-    /* tint slab */
     .slab{
       position:absolute;
       left:-80px;
@@ -107,13 +107,13 @@
 
     .ghost{
       position:absolute;
-      top:10px;
-      right:12px;
+      top:12px;
+      right:14px;
       font-family:"Oxanium", ui-monospace, monospace;
       font-weight:200;
-      letter-spacing:3px;
+      letter-spacing:3.5px;
       text-transform: lowercase;
-      font-size:12px;
+      font-size:15px;                  /* bigger */
       color: var(--txt);
       user-select:none;
       -webkit-user-select:none;
@@ -160,7 +160,7 @@
   </div>
 
 <script>
-/* ====== VISUAL: snap pad size to grid so center cross aligns perfectly ====== */
+/* ====== VISUAL: snap pad size to (2*grid) so center aligns to grid line ====== */
 (function snapToGrid(){
   const wrap = document.getElementById("wrap");
   const pad  = document.getElementById("pad");
@@ -173,11 +173,11 @@
 
   function snap(){
     const g = getGridPx();
+    const step = g * 2; // IMPORTANT: center line will be on a grid line only if size is multiple of 2*grid
     const r = wrap.getBoundingClientRect();
 
-    // Snap width/height to multiples of grid size (ensures exact center on grid lines)
-    const w = Math.max(g * 8, Math.floor(r.width  / g) * g);
-    const h = Math.max(g * 8, Math.floor(r.height / g) * g);
+    const w = Math.max(step * 4, Math.floor(r.width  / step) * step);
+    const h = Math.max(step * 4, Math.floor(r.height / step) * step);
 
     pad.style.width  = w + "px";
     pad.style.height = h + "px";
@@ -187,7 +187,7 @@
   snap();
 })();
 
-/* ====== AUDIO (same spec as before) ====== */
+/* ====== AUDIO (same spec) ====== */
 let ctx, master, gate;
 let osc, oscGain;
 let lfo, shaper, lfoDepth;
@@ -322,7 +322,7 @@ function applyXY(){
   lfo.frequency.value = msToLfoHz(ms);
 }
 
-/* --- noise buffers (3 types) --- */
+/* noise buffers */
 function makeWhiteBuffer(seconds=2){
   const len = Math.floor(ctx.sampleRate * seconds);
   const buf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -368,7 +368,6 @@ function ensureNoiseBuffers(){
   pinkBuf  = makePinkishBuffer(2);
   digiBuf  = makeDigitalBuffer(2);
 }
-
 function startNoise(type){
   ensureNoiseBuffers();
   stopNoise();
@@ -385,7 +384,7 @@ function stopNoise(){
   noiseSrc = null;
 }
 
-/* --- pip/keen one-shots (sine only) --- */
+/* pip/keen one-shots */
 function playGlitchOneShot(type){
   const now = ctx.currentTime;
 
@@ -447,7 +446,6 @@ function playGlitchOneShot(type){
   stopAt(now + 0.055);
 }
 
-/* --- start/stop --- */
 function startAudioGesture(){
   ensureAudio();
   unlockIOSOnce();
